@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% set base_path = "../" %}
+{% set page_title = "Home page | Run Pix Face" %}
+{% set page_description = "This is the home page" %}
+{% set main_header_clasheadses = "jumbotron jumbotron-fluid" %}
+
+{% import "components/macro-card.html" as macroCard %}
+
+{% block main %}
+
+  {{ super() }}
+
+  <div class="card-deck-wrapper">
+    
+    <h2>Menu</h2>
+    
+    <!-- <p>It takes an array and outputs them all as <code>&lt;div class="card"&gt;</code></p>
+     -->
+    <div class="card-deck">
+      
+      {% set cards = [
+        {
+          "card_image" : "http://placehold.it/450x150?text=IMAGE",
+          "card_title" : "RunPix ",
+          "card_text" : "Race Management solutions",
+          "card_url"  : "run-pix.web.app"
+        },
+        {
+          "card_image" : "http://placehold.it/450x150?text=IMAGE",
+          "card_title" : "Card 2",
+          "card_text" : "This is some card text, which may be a bit longer than the rest."
+        },
+        {
+          "card_image" : "http://placehold.it/450x150?text=IMAGE",
+          "card_title" : "API ",
+          "card_text" : 'This is API test',
+          "card_url"  : "/api/get"
+        }
+    ] %}
+      
+    {% for card in cards %}
+      {{ macroCard.cardMacro(card.card_image, card.card_title, card.card_text, card.card_url) }}
+    {% endfor %}
+      
+    </div>
+    
+  </div>
+
+{% endblock %}

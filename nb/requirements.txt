@@ -1,0 +1,6 @@
+firebase_admin 
+firebase 
+pandas 
+gspread
+PIL
+matplotlib

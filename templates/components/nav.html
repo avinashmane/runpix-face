@@ -1,0 +1,13 @@
+{% import "components/macro-search.html" as macroSearch %}
+
+<nav class="nav nav-pills">
+  
+    {% for item in navItems %}
+      <a class="nav-item nav-link" href="{{ item.menu_item | lower | replace(" ", "") }}.html">{{ item.menu_item }}</a>
+    {% endfor %}
+    
+    {% block navRight %}
+      {{ macroSearch.search() }}
+    {% endblock %}
+    
+  </nav>

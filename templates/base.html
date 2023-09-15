@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  
+<head>
+  <meta charset="utf-8">
+  <title>{{ page_title }}</title>
+  <meta name="description" content="{{ page_description }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.0.0-alpha.6/css/bootstrap.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+  
+<body class="{{ body_classes }}">
+  
+  <article>
+    <nav id="main-nav" class="container-fluid navbar navbar-dark bg-inverse {{ main_nav_classes }}">
+      <div class="container">
+        {% block nav %}
+        	{% set navItems = [{"menu_item" : "Index"}, {"menu_item" : "Page 1"}, {"menu_item" : "Page 2"}] %}
+          {% include "components/nav.html" %}
+        {% endblock %}
+      </div>
+    </nav>
+    <header id="main-header" class="container-fluid {{ main_header_classes }}">
+      <div class="container">
+        {% block header %}
+          {% include "components/header.html" %}
+        {% endblock %}
+      </div>
+    </header>
+    <section id="main-section" class="container-fluid {{ main_section_classes }}">
+      <div class="container">
+        {% block main %}
+        <!-- This block (and any other block) can be replaced using template inheritance, or leave the default content in -->
+          <h2>This is the default content.</h2>
+          <!-- <p>It's inside of the <code>{{ "{% block main %}" | escape }}</code>, so it will appear in any file using this template. You can override it directly from that file.</p> -->
+        {% endblock %}
+      </div>
+    </section>
+    
+    <hr>
+    
+    <footer id="main-footer" class="container-fluid m-t-3 {{ main_footer_classes }}">
+      <div class="container">
+        {% block footer %}
+          {% include "components/footer.html" %}
+        {% endblock %}
+      </div>
+    </footer>
+    
+  </article>
+
+  {% block footer_scripts %}
+    {% include "components/_footer-scripts.html" %}
+  {% endblock %}
+  
+</body>
+  
+</html>
+
+

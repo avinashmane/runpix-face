@@ -1,0 +1,52 @@
+{
+  "name": "runpix-face",
+  "description": "Face match",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "dev": "GOOGLE_APPLICATION_CREDENTIALS=/home/avinashmane/.config/firebase/serviceaccount.json SERVICE_NAME=runpix-face GOOGLE_CLOUD_PROJECT=run-pix node index.js",
+    "gs": "SERVICE_NAME=runpix-face GOOGLE_CLOUD_PROJECT=run-pix node node-db.js gs://run-pix.appspot.com/processed/testrun/ database",
+    "loc": "SERVICE_NAME=runpix-face GOOGLE_CLOUD_PROJECT=run-pix node node-db.js ../demo/ database",
+    "build": "node build.js",
+    "lint": "eslint src/ demo/",
+    "set-env": "export $(cat .env | grep \"^[^#;]\" |xargs)",
+        "test": "GOOGLE_CLOUD_PROJECT=run-pix npx mocha index.js ",
+        "test_pub": "GOOGLE_CLOUD_PROJECT=run-pix npx mocha --watch test/test_pub.js ",
+    
+        "test_tasks": "GOOGLE_APPLICATION_CREDENTIALS=/home/avinashmane/.config/firebase/serviceaccount.json SERVICE_NAME=runpix-face GOOGLE_CLOUD_PROJECT=run-pix npx mocha --watch test/test_cloudtask.js ",
+    "test_img": "SERVICE_NAME=runpix-face GOOGLE_CLOUD_PROJECT=run-pix npx mocha --watch test/test_main.js  gs://run-pix.appspot.com/processed/testrun/ database",
+    "test-env": "npm run set-env && echo ${SERVICE_NAME} && echo TEST",
+    "test_all": "npx mocha -j 2 -p test/test_*.js",
+    "mocha": "mocha test_app_1.js --watch",
+    "scan": "npx auditjs@latest ossi --dev --quiet",
+    "apptest": "c8 mocha -p -j 2 test/index.test.js --exit",
+    "system-test": "NAME=Cloud c8 mocha -p -j 2 test/system.test.js --timeout=180000"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "author": "Avinash Mane",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@google-cloud/pubsub": "^4.0.5",
+    "@google-cloud/tasks": "^4.0.1",
+    "@petamoriken/float16": "^3.8.3",
+    "@tensorflow/tfjs": "^4.7.0",
+    "@tensorflow/tfjs-node": "^4.7.0",
+    "@vladmandic/build": "^0.9.2",
+    "@vladmandic/pilogger": "^0.4.8",
+    "dotenv": "^16.3.1",
+    "express": "^4.17.1",
+    "firebase-admin": "^11.10.1",
+    "nunjucks": "^3.2.4"
+  },
+  "devDependencies": {
+    "c8": "^8.0.0",
+    "chai": "^4.3.8",
+    "google-auth-library": "^9.0.0",
+    "got": "^11.0.0",
+    "mocha": "^10.2.0",
+    "supertest": "^6.0.0"
+  }
+}

@@ -1,0 +1,6 @@
+{% macro search(placeHolder="Search stuff...", buttonText="Search") %}
+  <form class="form-inline ml-auto">
+    <input class="form-control mr-1" type="text" placeholder="{{ placeHolder }}">
+    <button class="btn btn-success-outline" type="submit">{{ buttonText }}</button>
+  </form>
+{% endmacro %}
