@@ -12,6 +12,10 @@ Topic name: projects/run-pix/topics/faceid
 
 gcloud run services add-iam-policy-binding runpix-face --member=serviceAccount:firebase-adminsdk-spqa9@run-pix.iam.gserviceaccount.com --role=roles/run.invoker --project run-pix
 
+### Env
+
+BUCKET : bucket
+GOOGLE_APPLICATION_CREDENTIALS: service account
 
 ## Local Development
 ## UT
@@ -68,7 +72,11 @@ test/runner.sh sleep 20
 * `REGION`: [`us-central1`] Optional override region for the location of the Cloud Run service.
 * `SERVICE_NAME`: The name of the deployed service, used in some API calls and test assertions.
 
+
 ## Dependencies
 
 * **express**: Web server framework.
 * **got**: [Testing] Used to make HTTP requests of the running service in end-to-end testing.
+
+
+[https://www.google.com]

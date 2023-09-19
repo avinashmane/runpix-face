@@ -10,10 +10,9 @@ const path = require('path');
 const log = console.log //require('@vladmandic/pilogger');
 const tf = require('@tensorflow/tfjs-node'); // in nodejs environments tfjs-node is required to be loaded before face-api
 const faceapi = require('./dist/face-api.node.js'); // use this when using face-api in dev mode
-// const faceapi = require('@vladmandic/face-api'); // use this when face-api is installed as module (majority of use cases)
 
-const { getFiles , readFile  }  = require("./filestorage.js")
-const { descriptor2fid, fid2descriptor,  setDoc  }  = require("./facedatabase.js")
+const { getFiles , readFile , getEventFile }  = require("./filestorage.js")
+const { descriptor2fid, fid2descriptor,descriptor2blob,  setDoc, retrieveFaces  }  = require("./facedatabase.js")
 let modelLoaded=false
 let subSet= (obj,keys) => keys.reduce((a,k)=>{a[k]=obj[k];return a;},{})
 
@@ -34,11 +33,16 @@ async function initFaceAPI() {
     optionsSSDMobileNet = new faceapi.SsdMobilenetv1Options({ minConfidence, maxResults: 100 });
 }
 
-async function getDescriptors(imageFile) {
+/**
+ * 
+ * @param {*} imageFile 
+ * @param {*} minConfidence 
+ */
+async function getDescriptors(imageFile,minConfidence) {
     if (!modelLoaded) {
         initFaceAPI(); modelLoaded=true;
     }
-    const buffer = await readFile(imageFile)
+    const buffer = await readFile(imageFile);
     const tensor = tf.node.decodeImage(buffer, 3);
     const faces = await faceapi.detectAllFaces(tensor, optionsSSDMobileNet)
         .withFaceLandmarks()
@@ -49,40 +53,120 @@ async function getDescriptors(imageFile) {
     //   faces.forEach(f=>{
     //     log.data(`x:${xpct} y:${ypct} ${expr[0]} ${expr[1].toFixed(2)}`,f.gender,f.age.toFixed(0))
     //   })
-    return faces.map((f) => {
-        let expr = Object.entries(f.expressions).sort(function (a, b) { return b[1] - a[1]; })[0]
-        expr[1]=expr[1].toFixed(2)//
-        let xpct = Math.round(20 * f.alignedRect.box.left / f.alignedRect.imageWidth) * 20
-        let ypct = Math.round(20 * f.alignedRect.box.top / f.alignedRect.imageHeight) * 20
+    return faces.filter(x=>(x.detection.score> (minConfidence||0.7)))
+                .map((f) => {
+
+        let expr = Object.entries(f.expressions)
+                            .sort(function (a, b) { return b[1] - a[1]; })[0]
+        //expr[1]=expr[1].toFixed(2)//
+        let xpct = Math.round(100 * f.alignedRect.box.left / f.alignedRect.imageWidth) 
+        let ypct = Math.round(100 * f.alignedRect.box.top / f.alignedRect.imageHeight) 
 
         return {
-            "f": path.basename(imageFile),
-            "fid": descriptor2fid(f.descriptor),
+            // "f": path.basename(imageFile),
+            "fid": f.descriptor,
             "expression": expr,
             "pos": [xpct, ypct],
             "gender": f.gender,
-            age: f.age.toFixed(0),
+            age: Math.round(f.age),
+            score: f.detection.score,
         }
     });
 }
-async function registerImage(event,inputFile) {
-    if (!inputFile.toLowerCase().endsWith('jpg') && !inputFile.toLowerCase().endsWith('png') && !inputFile.toLowerCase().endsWith('gif')) return [];
-    log('Registered:', inputFile);
-    let data =await getDescriptors(`gs://run-pix.appspot.com/processed/${event}/${inputFile}`);
-                
-    let faceDescriptors=data.map(x=> subSet(x, ["fid","expression","age","gender","pos"]))
-    saveFaces(event,inputFile,{"f":faceDescriptors})
-    console.log(`${inputFile}: ${faceDescriptors.length} faces`)
 
-    return data
+/**
+ * 
+ * @param {*} event 
+ * @param {*} inputFile 
+ * @param {*} noDbSave 
+ */
+async function registerImage(event,inputFile,noDbSave) {
+    if (!inputFile.toLowerCase().endsWith('jpg') && !inputFile.toLowerCase().endsWith('png') && !inputFile.toLowerCase().endsWith('gif')) return [];
+    log('Registering',new Date(), inputFile);
+    let data =await getDescriptors(getEventFile(event, inputFile));
+                
+    let faceDescriptors=data.map(x=> subSet(x, ["fid","expression","age","gender","pos","score"]))
+    if(!noDbSave) {
+        saveFaces(event,inputFile,{"f":faceDescriptors})
+        console.log(`${inputFile}: ${faceDescriptors.length} faces`)
+    }
+    return faceDescriptors
 
 }
 
+
+
 function saveFaces(event,image,data){
-    let fspath = `races/${event}/faces/${image}`
-    setDoc(fspath,data)
+    let fspath = (i) => `races/${event}/images/${image}/f/${i}`
+    // setDoc(fspath(i),x)
+    
+    data=data.f.map((x,i)=>{
+                        // x.fid=descriptor2fid(x.fid)
+                        x.fid=descriptor2blob(x.fid)
+                        setDoc(fspath(i),x)
+                    })
     // const fs = require('fs');
     // fs.writeFileSync('database'+'.db',JSON.stringify(data))
+}
+
+/**
+ * 
+ * @param {*} event 
+ * @param {*} filePath 
+ * @param {*} opts : maxDist, firebaseResults
+ */
+async function matchFaceInFile(event,filePath,opts) {
+
+    let fids = await retrieveFaces(event)
+    // let file='2023-06-11T06:16:32.338Z~VENUE~presspune$gmail.com~1P6A6994.jpg'
+    if (typeof filePath === 'string'){
+        // var searchFids=fids.filter(x=>x.file==file)
+        var searchFids =await getDescriptors(filePath);
+        
+        searchFids=searchFids.filter((f,i) => (f.score>.9) || (i<0))
+        console.info(`Found ${searchFids.length} faces for scanning in ${filePath}`)
+    } else {
+        console.error("send the blob for scanning")
+    }
+    
+    if  (searchFids.length) {    
+    
+        maxDist = opts?.maxDist || 0.4 //lower is strict
+        let matches=[]
+
+        for (let curFile in fids) { // for each file
+            loopSearch:
+            for (let i=0; i<fids[curFile].length ; i++){  // for face in file
+                for (let searchFaceNo = 0; searchFaceNo < searchFids.length; searchFaceNo++) {           
+                    let dist=await faceapi.euclideanDistance(
+                                        searchFids[searchFaceNo].fid, 
+                                        fids[curFile][i])
+                        
+                    if (dist <= maxDist) {
+
+                        matches.push([i, curFile, dist]);
+
+                        if (opts?.firebaseResults){
+                            setDoc(`facesearch/${event}/${filePath}/${curFile}`,
+                                    {f:`${searchFaceNo}/${searchFids.length}`,d:dist })
+                        }// console.log(`${file}:${searchFaceNo} ${i} ${dist}`)
+                        break loopSearch;
+                    }
+                }
+            }
+        }
+        matches.sort(function (a, b) { return b[1] - a[1]; })
+        return matches
+    } else{ 
+        console.warn(`No faces found in the ${filePath}`)
+    }
+}
+
+
+async function matchFace(event,file,name, addtoPool) {
+
+    
+
 }
 
 async function main(argv) {
@@ -129,8 +213,10 @@ async function main(argv) {
 }
 
 exports.saveFaces=saveFaces
+exports.matchFace=matchFace
 exports.subSet=subSet
 exports.registerImage=registerImage
+exports.matchFaceInFile=matchFaceInFile
 // exports.main=main
 
 // main();

@@ -12,20 +12,35 @@ const app=getApp()
 const storage = getStorage(app)
 const fs = require('fs');
 
+let folder=process.env['INPUT_FOLDER'] || 'processed'
+let bucket=process.env['BUCKET'] || 'run-pix.appspot.com'
+
+exports.getEventFile = (event, file, gs_folder) =>{
+    gs_folder=gs_folder||folder;
+    return `gs://${bucket}/${gs_folder}/${event}/${file}`;
+}
 
 exports.readFile = async function (filePath) {
     let contents;
-    if (filePath.substring(0,5).toLowerCase()=='gs://'){
-        let gs_path =getGSpath(filePath)
-        contents =   await getStorage().bucket(gs_path[1]).file(gs_path[2]).download()
-        contents = contents[0]
-    } else {
-        contents = fs.readFileSync(filePath);
+    try{
+        if (filePath.substring(0,5).toLowerCase()=='gs://'){
+            let gs_path =getGSpath(filePath)
+            contents =   await getStorage().bucket(gs_path[1]).file(gs_path[2]).download()
+            contents = contents[0]
+        } else {
+            contents = fs.readFileSync(filePath);
+        }
+        return contents;
+    } catch (e) {
+        console.error(e)
     }
-    return contents;
 }
+/**
+ * 
+ * @param {*} dirPath 
+ */
 function getGSpath(dirPath){
-    let dirPref= dirPath.split("/",3)    
+    let dirPref= dirPath.split("/",3) ;   
     let prefix = dirPath.replace(dirPref.join("/"),"")
     if (prefix[0]=="/") prefix = prefix.substring(1)  
     return ["gs://",dirPref[2],prefix]
@@ -103,6 +118,13 @@ let getFilesStorage = async function (bucketName, prefix) {
             .catch(console.error);
  }
 
+ function getUrl(gs_path)  {
+    // const path = require('node:path'); 
+    let [b,base,file] = /(?:gs\:\/\/)*([^\/]+)\/(.*)\/([^\/]+)$/.exec(gs_path).slice(1)
+    // console.log(encodeURIComponent(file))
+    return `https://storage.googleapis.com/${b}/${base}/${encodeURIComponent(file)}` //&alt=media
+
+ }
 
  /**
   * unused..not working
@@ -146,14 +168,6 @@ let getFilesStorage = async function (bucketName, prefix) {
 // }
 
 
-// // let storage=null
-// // function getStorage() {
-// //     if (!storage) {
-// //         app = getApp()
-// //         let { Storage } = require('@google-cloud/storage');
-// //         // Creates a client
-// //         storage = new Storage();
-// //     }
-// //     return storage
-// // }
+exports.getUrl = getUrl
+exports.bucket=bucket
 

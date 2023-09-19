@@ -1,18 +1,21 @@
 const { initializeApp, cert, getApps } = require('firebase-admin/app');
 
-// import { getStorage, ref, listAll } from "firebase/storage";
-const serviceAccount = require('/home/avinashmane/.config/firebase/serviceaccount.json');
-
+// process.env. =process.env.get'/home/avinashmane/.config/firebase/serviceaccount.json'
+// const serviceAccount = require();
+console.info(`GOOGLE_APPLICATION_CREDENTIALS=${process.env.GOOGLE_APPLICATION_CREDENTIALS}`)
 exports.getApp = function  () {
-    apps=getApps()
+    let apps=getApps()
+
     if (!apps.length) {
-        var app = initializeApp({
-            credential: cert(serviceAccount),
-            storageBucket: 'run-pix.appspot.com'
-        });
+        let opts= {
+            storageBucket: process?.env?.BUCKET || 'run-pix.appspot.com'
+        }
+        // if(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+        //     opts.credential= cert(serviceAccount);
+            
+        return initializeApp(opts);
     } else {
-        app = apps[0]
+        return apps[0]
     }
-    // console.log("getApp()")
-    return app
+
 }
