@@ -5,45 +5,55 @@ const { getFirestore } = require('firebase-admin/firestore');
 
 app = getApp()
 let db = getFirestore()
+let  msBufferExpiry=1000*3600 // buffer expires after 1 hr
 
 async function retrieveFacesAll(event) {
     //`/races/${event}/faces`
-    event='testrun'
+    
     let imageFaces={}
-    let images = await getDocs(`races/${event}/images`)
+    let images = await getDocs(`races/${event}/images`).catch(console.error)
     // let images = await db.collection(`facesearch/${event}/images`).collectionGroup().then(x=>
 
+    // i=1
+    promises=[]
     for (let img in images){
-        // console.log(img)
-        const faces=await getDocs(`races/${event}/images/${img}/f`)
-        imageFaces[img]=Object.values(faces)
+        // console.log(i++,img)
+        promises.push( await getDocs(`races/${event}/images/${img}/f`)
+                        .then(faces=>{
+                            imageFaces[img]=Object.values(faces).map(face1=>{
+                                    face1.fid= blob2descriptor(face1.fid)
+                                    return face1;
+                            })
+                        })
+                    )
+        
     }
+    await Promise.all(promises)
+    // for (let img in images){
+    //     console.log(i++,img)
+    //     const faces=await getDocs(`races/${event}/images/${img}/f`)
+    //     imageFaces[img]=Object.values(faces)
+    // }
+    // return  imageFaces
     return  imageFaces
 
-    
-}
-
-function blob2descriptor(blob) {
-    return new Float32Array(blob.buffer);
-    
-}
-function descriptor2blob(arr) {
-    return new Buffer.from(arr.buffer)
 }
 
 
 let faceDb={event:null,fids:[],ts:null} // for caching
 async function retrieveFaces(event) {
-    if ((faceDb!=event) & (faceDb.ts+100000 < new Date())){
+    //  diffrent event        or  buffer expired
+
+    if ((faceDb.event!=event) || (faceDb.ts && (new Date(faceDb.ts.getTime() + msBufferExpiry) < new Date()))){
         let fidObj = await retrieveFacesAll(event)
-        let onlyKeys =Object.keys(fidObj)     //for all files
-        let fids = onlyKeys.map((file)=>{
-                fileFaces=fidObj[file]
-                return fileFaces.map(x=> 
-                    blob2descriptor(x.fid)) //only fid
-            })  ;
+        let fids={}
+        for (let f in fidObj){     //for all files
+            if(fidObj[f].length)  // if face in the file
+                fids[f]= fidObj[f].map((x)=> 
+                    x.fid); //get only the fid decsription
+        }
         faceDb = {event:event,
-                  fids:  fids.filter(x=>x.length!=0),
+                  fids:  fids,
                   ts: new Date() }
     }
     return faceDb.fids
@@ -59,7 +69,7 @@ exports.listColls= async function (path) {
 let getDocs= async function (path) {
     // console.log(db.collection)
     try{
-        data = await db.collection(path).get()
+        data = await db.collection(path).get().catch(console.error)
         // console.log(data.docs.map(d=>d.id))
         let ret={}
         data.docs.forEach(d=>{
@@ -129,6 +139,23 @@ let fid2descriptor = (jsonStr) => JSON.parse(jsonStr, function (key, value) {
     return value;
 });
 
+function blob2descriptor(buf) {
+    return new Float32Array(buf.buffer.slice(buf.offset,buf.offset+buf.length));
+    
+}
+function descriptor2blob(arr) {
+    return new Buffer.from(arr.buffer)
+}
+
+function b64ToDescriptor(b64) {
+    return blob2descriptor(Buffer.from(b64, 'base64'))
+    
+}
+function descriptorToB64(arr) {
+    return new Buffer.from(arr.buffer).toString('Base64')
+}
+
+
 exports.retrieveFacesAll=retrieveFacesAll
 exports.retrieveFaces=retrieveFaces
 exports.getDocs=getDocs
@@ -136,3 +163,5 @@ exports.fid2descriptor=fid2descriptor
 exports.descriptor2fid=descriptor2fid
 exports.descriptor2blob=descriptor2blob
 exports.blob2descriptor=blob2descriptor
+exports.descriptorToB64=descriptorToB64
+exports.b64ToDescriptor=b64ToDescriptor

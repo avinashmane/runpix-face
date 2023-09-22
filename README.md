@@ -5,8 +5,11 @@ This sample shows how to deploy a Hello World application to Cloud Run.
 
 ## setup
 
+### run time
 gcloud config set project run-pix
+gcloud auth application-default login
 
+### test
 Subscription name: projects/run-pix/subscriptions/faceid-processor 
 Topic name: projects/run-pix/topics/faceid 
 

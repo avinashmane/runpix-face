@@ -23,7 +23,7 @@ exports.getEventFile = (event, file, gs_folder) =>{
 exports.readFile = async function (filePath) {
     let contents;
     try{
-        if (filePath.substring(0,5).toLowerCase()=='gs://'){
+        if (filePath.substring(0,5).toLowerCase()=='gs://' || filePath.includes(folder)){
             let gs_path =getGSpath(filePath)
             contents =   await getStorage().bucket(gs_path[1]).file(gs_path[2]).download()
             contents = contents[0]

@@ -3,7 +3,7 @@ const { initializeApp, cert, getApps } = require('firebase-admin/app');
 // process.env. =process.env.get'/home/avinashmane/.config/firebase/serviceaccount.json'
 // const serviceAccount = require();
 console.info(`GOOGLE_APPLICATION_CREDENTIALS=${process.env.GOOGLE_APPLICATION_CREDENTIALS}`)
-exports.getApp = function  () {
+const getApp = function  () {
     let apps=getApps()
 
     if (!apps.length) {
@@ -19,3 +19,6 @@ exports.getApp = function  () {
     }
 
 }
+
+exports.getApp=getApp
+getApp()

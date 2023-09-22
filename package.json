@@ -15,8 +15,7 @@
     "set-env": "export $(cat .env | grep \"^[^#;]\" |xargs) && echo ${SERVICE_NAME}",
     "test": "npm run test_face ",
     "server": "export $(cat .env | grep \"^[^#;]\" |xargs) &&  node index.js ",
-    "test_face": 
-    "export $(cat .env | grep \"^[^#;]\" |xargs) &&  npx mocha --watch test/test_facedesc.js ",
+    "test_face": "env-cmd  npx mocha --watch test/test_facedesc.js ",
     "test_fstore": "export $(cat .env | grep \"^[^#;]\" |xargs) &&  npx mocha --watch test/test_firestore.js -grep get ",
     "test_tasks": "GOOGLE_APPLICATION_CREDENTIALS=/home/avinashmane/.config/firebase/serviceaccount.json SERVICE_NAME=runpix-face GOOGLE_CLOUD_PROJECT=run-pix npx mocha --watch test/test_cloudtask.js ",
     "test_img": "SERVICE_NAME=runpix-face GOOGLE_CLOUD_PROJECT=run-pix npx mocha --watch test/test_main.js  gs://run-pix.appspot.com/processed/testrun/ database",
@@ -31,6 +30,7 @@
     "node": ">=16.0.0"
   },
   "dependencies": {
+    "@cdxoo/dbscan": "^1.1.1",
     "@google-cloud/pubsub": "^4.0.5",
     "@petamoriken/float16": "^3.8.3",
     "@tensorflow/tfjs": "^4.7.0",
