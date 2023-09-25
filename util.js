@@ -10,6 +10,17 @@ let getAvg = (jsonArray,attr) => {
 
 }
 
+function log(...arg){
+    
+    if ( process.env.DEBUG) {
+        let prefix="\t\t\t"+(process.env.DEBUG=="TS"?new Date().toISOString():'');
+        console.log(prefix, ...arg)
+    }
+}
+
+
+exports.keyCount=(obj)=>Object.keys(obj).length
 
 exports.fltSubArr=fltSubArr
 exports.getAvg=getAvg
+exports.log=log 

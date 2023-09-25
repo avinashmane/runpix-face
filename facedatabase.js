@@ -1,45 +1,81 @@
 
 const {getApp}  = require( './myfirebase');
 const { getFirestore } = require('firebase-admin/firestore');
-// import { collection, doc, setDoc } from "firebase/firestore";
+const  mapLimit = require("async/mapLimit");
+const { log} = require('./util')
+var _ = require('lodash');
+const { data } = require('@tensorflow/tfjs');
 
 app = getApp()
 let db = getFirestore()
-let  msBufferExpiry=1000*3600 // buffer expires after 1 hr
+const  msBufferExpiry=1000*3600 // buffer expires after 1 hr
+const MAX_RETRY_ATTEMPTS=1
+let imageFaces={}
+let loading={}
+
 
 async function retrieveFacesAll(event) {
-    //`/races/${event}/faces`
     
-    let imageFaces={}
-    let images = await getDocs(`races/${event}/images`).catch(console.error)
-    // let images = await db.collection(`facesearch/${event}/images`).collectionGroup().then(x=>
+    let images=[]
 
-    // i=1
-    promises=[]
-    for (let img in images){
-        // console.log(i++,img)
-        promises.push( await getDocs(`races/${event}/images/${img}/f`)
-                        .then(faces=>{
-                            imageFaces[img]=Object.values(faces).map(face1=>{
-                                    face1.fid= blob2descriptor(face1.fid)
-                                    return face1;
+    if (_.isEmpty(imageFaces)){
+        if (!loading.retrieveFacesAll_img) {
+            
+            loading.retrieveFacesAll_img=getIds(`races/${event}/images`)
+                    .then(data=>{ 
+                        images=data
+                        log('got imgs')
+                    })
+                    .catch(console.error)
+        } 
+        await loading.retrieveFacesAll_img
+        try {delete loading.retrieveFacesAll_img} catch {}
+
+        log('mapLimit')
+        if ('DEBUG' in process.env) console.time("read")
+        if (!loading.retrieveFacesAll){ 
+            loading.retrieveFacesAll = mapLimit(images,50,getFaces).catch(console.error)      
+        }
+        await loading.retrieveFacesAll
+        if ('DEBUG' in process.env) console.timeEnd("read")    
+        try {delete loading.retrieveFacesAll} catch {}
+        // promises=[]
+        // for (let img in images){
+        //     // console.log(i++,img)
+        //     promises.push( await getDocs(`races/${event}/images/${img}/f`)
+        //                     .then(faces=>{
+        //                         imageFaces[img]=Object.values(faces).map(face1=>{
+        //                                 face1.fid= blob2descriptor(face1.fid)
+        //                                 return face1;
+        //                         })
+        //                     })
+        //                 )
+            
+        // }
+
+        // await Promise.all(promises)
+        // for (let img in images){
+        //     console.log(i++,img)
+        //     const faces=await getDocs(`races/${event}/images/${img}/f`)
+        //     imageFaces[img]=Object.values(faces)
+        // }
+        async function getFaces(file) {
+            // console.log(file);
+            return await getDocs(`races/${event}/images/${file}/f`)
+                            .then(faces=>{
+                                imageFaces[file]=Object.values(faces).map(face1=>{
+                                        face1.fid= blob2descriptor(face1.fid)
+                                return face1;
+                                })
                             })
-                        })
-                    )
+        }
         
     }
-    await Promise.all(promises)
-    // for (let img in images){
-    //     console.log(i++,img)
-    //     const faces=await getDocs(`races/${event}/images/${img}/f`)
-    //     imageFaces[img]=Object.values(faces)
-    // }
-    // return  imageFaces
     return  imageFaces
 
 }
 
-
+/** we have new version to search fro firestore:/facesearch
 let faceDb={event:null,fids:[],ts:null} // for caching
 async function retrieveFaces(event) {
     //  diffrent event        or  buffer expired
@@ -58,7 +94,16 @@ async function retrieveFaces(event) {
     }
     return faceDb.fids
 }
-
+ */
+let retrieveFaces = _.memoize(retrieveFacesFireStore)
+async function retrieveFacesFireStore(event) {
+    let data = await getDocs(`/facesearch/${event}/clusters/`);
+    data = _.values(data).map(k=> {
+        k.fid=blob2descriptor(k.fid);
+        return k ;
+    })
+    return data;
+}
 
 exports.listColls= async function (path) {
 
@@ -69,7 +114,7 @@ exports.listColls= async function (path) {
 let getDocs= async function (path) {
     // console.log(db.collection)
     try{
-        data = await db.collection(path).get().catch(console.error)
+        let data = await db.collection(path).get().catch(console.error)
         // console.log(data.docs.map(d=>d.id))
         let ret={}
         data.docs.forEach(d=>{
@@ -81,11 +126,14 @@ let getDocs= async function (path) {
     }
 }
 
-exports.delDoc= async function (path) {
-    try{
-        ret = await db.doc(path).delete()
-        return ret;
-        
+let getIds= async function (path) {
+    try {
+        let data = await db.collection(path)
+                .get()
+                .then(x=>
+                    x.docs.map(d=>d.id))
+                .catch(console.error)
+        return  data
     } catch (e) {
         console.error(e)
     }
@@ -99,6 +147,32 @@ exports.setDoc= async function (path,data) {
     } catch (e) {
         console.error(e)
     }
+}
+
+exports.delDoc= async function (path, options) {
+    if (options?.recursive) 
+        await deleteDocumentRecursive(db.doc(path))
+    try{
+        ret = await db.doc(path).delete()
+        return ret;
+        
+    } catch (e) {
+        console.error(e)
+    }
+
+}
+
+async function deleteDocumentRecursive(docRef){
+    const bulkWriter = db.bulkWriter();
+    bulkWriter.onWriteError((error) => {
+        if (error.failedAttempts < MAX_RETRY_ATTEMPTS ) {
+            return true;
+        } else {
+            console.log('Failed write at document: ', error.documentRef.path);
+            return false;
+        }
+    });
+    return await db.recursiveDelete(docRef, bulkWriter);
 }
 
 let descriptor2fid = (obj) => JSON.stringify(obj, function (key, value) {
@@ -159,6 +233,8 @@ function descriptorToB64(arr) {
 exports.retrieveFacesAll=retrieveFacesAll
 exports.retrieveFaces=retrieveFaces
 exports.getDocs=getDocs
+exports.getIds=getIds
+exports.delDoc=this.delDoc
 exports.fid2descriptor=fid2descriptor
 exports.descriptor2fid=descriptor2fid
 exports.descriptor2blob=descriptor2blob
