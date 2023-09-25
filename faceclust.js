@@ -45,7 +45,6 @@ function clustering(event, dataset, minScore, eps) {
     let data = dataset.filter(x => x.score > minScore);
     let n = data.length;
 
-    //console.time("dbscan");
     var ret = dbscan({
         dataset: data.slice(0, n),
         epsilon: eps,
@@ -72,7 +71,6 @@ function clustering(event, dataset, minScore, eps) {
 
     ret.noise.forEach(i => clusterDocs.push(data[i]));
     
-    
     clusterDocs.forEach((x,i)=>{
         x.fid=descriptor2blob(x.fid) ;
         docKey=String(i).padStart(4, '0')+"-"+x.age.toFixed(0)
@@ -86,13 +84,11 @@ function clustering(event, dataset, minScore, eps) {
         }
     })
     
-    // ret.noise.forEach(i => clusters.push([data[i]]));
-
     return { clusters, ret };
 
 }
 
-function prepareForClustering(filesNames, fids, dataset) {
+function prepareForClustering( fids) {
     filesNames = Object.keys(fids);
     dataset = [];
     filesNames.forEach(f => 

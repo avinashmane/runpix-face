@@ -24,20 +24,18 @@ async function retrieveFacesAll(event) {
             loading.retrieveFacesAll_img=getIds(`races/${event}/images`)
                     .then(data=>{ 
                         images=data
-                        log('got imgs')
+                        log(`got ${data.length} imgs`)
                     })
                     .catch(console.error)
         } 
         await loading.retrieveFacesAll_img
         try {delete loading.retrieveFacesAll_img} catch {}
 
-        log('mapLimit')
-        if ('DEBUG' in process.env) console.time("read")
         if (!loading.retrieveFacesAll){ 
             loading.retrieveFacesAll = mapLimit(images,50,getFaces).catch(console.error)      
         }
         await loading.retrieveFacesAll
-        if ('DEBUG' in process.env) console.timeEnd("read")    
+        
         try {delete loading.retrieveFacesAll} catch {}
         // promises=[]
         // for (let img in images){
@@ -112,10 +110,9 @@ exports.listColls= async function (path) {
 }
 
 let getDocs= async function (path) {
-    // console.log(db.collection)
+    
     try{
         let data = await db.collection(path).get().catch(console.error)
-        // console.log(data.docs.map(d=>d.id))
         let ret={}
         data.docs.forEach(d=>{
             ret[d.id]=d.data()

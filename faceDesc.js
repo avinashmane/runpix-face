@@ -82,7 +82,7 @@ async function getDescriptors(imageFile,minConfidence) {
  */
 async function registerImage(event,inputFile,noDbSave) {
     if (!inputFile.toLowerCase().endsWith('jpg') && !inputFile.toLowerCase().endsWith('png') && !inputFile.toLowerCase().endsWith('gif')) return [];
-    log('Registering',new Date(), inputFile);
+    // log('Registering', inputFile);
     let data =await getDescriptors(getEventFile(event, inputFile));
                 
     let faceDescriptors=data.map(x=> subSet(x, ["fid","expression","age","gender","pos","score"]))
@@ -155,8 +155,9 @@ async function matchFaceInFile(event,filePath,opts) {
                     files=[clusters[i].file]
                 
                     // insert one row for each file
+                log(`search:${searchFaceNo} = ${i} => ${(dist).toFixed(2)} ${clusters[i].size}/${file[0].slice(-15)}`)    
+                    
                 files.forEach((file,j)=>{
-                    log(`search:${searchFaceNo} = ${i} => ${(dist).toFixed(2)} ${clusters[i].size}/${file.slice(-15)}`)    
                     let matchImg={
                         dist:dist,
                         file:file,
@@ -165,7 +166,8 @@ async function matchFaceInFile(event,filePath,opts) {
                     matches.push(matchImg)
 
                     if (opts?.firebaseResults){        
-                        setDoc(`facesearch/${event}/uploads//${basename}/matches/${i}-${j}`,matchImg)
+                        let clustName =`${String(i).padStart(4, '0')}${clusters[i].size?"=":"-"}${String(j).padStart(2,'0')}`
+                        setDoc(`facesearch/${event}/uploads/${basename}/matches/${clustName}`,matchImg)
                     }
                 }) ;
 

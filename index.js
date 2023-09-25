@@ -17,8 +17,11 @@
 const express = require('express');
 const nj = require('nunjucks') ;
 const { getFiles ,getEventFile  }  = require("./filestorage.js")
-// const { descriptor2fid, fid2descriptor,  setDoc  }  = require("./facedatabase.js")
+const { delDoc, retrieveFacesAll  }  = require("./facedatabase.js")
 const {registerImage, matchFaceInFile, saveFaces} = require("./faceDesc")
+const { clustering,prepareForClustering } = require("./faceclust")
+const {log} = require("./util.js")
+const _ = require("lodash")
 
 const app = express();
 var cors = require('cors')
@@ -53,30 +56,59 @@ app.get('/api/getList', async (req, res) => {
     }
 });
 
-app.get('/api/procRace', async (req, res) => {
-    if (req.query?.event){
-        let event=req.query?.event
-        
-        st_path=getEventFile( event , "")
+app.get('/api/eventscan', async (req, res) => {
+    if (req.query?.event) {
+        let event = req.query?.event
+
+        st_path = getEventFile(event, "")
         const dir = await getFiles(st_path)
-        console.info(`processing ${dir.length} at ${st_path}`);
-        res.send(`processing ${dir.length}. Check log `);
-   
+        log(`processing ${dir.length} at ${st_path}`);
+        // res.send(`processing ${dir.length}. Check log `);
+
         for (const f of dir) {
-            let fDescr = await registerImage(event,f)
+            let fDescr = await registerImage(event, f)
         }
         console.info(`processed ${dir.length} `);
-        
-         } else {
+        res.status(202).send();
+    } else {
         res.status(500).send('Something broke!')
     }
 
 });  
 
 
+app.get('/api/eventcluster', async (req, res) => {
+    if (req.query?.event) {
+        let event = req.query?.event
+
+        let minScore = process.env.CLUSTER_MINSCORE ?? .98
+        let eps = process.env.CLUSTER_EPSILON ?? .3
+        
+        delDoc(`/facesearch/${event}`, { recursive: true })
+            .then(x => log(`deleted /facesearch/${event}`))
+            .catch(console.error);
+        
+        await retrieveFacesAll(event)
+            .then(fids => {
+            
+                //map fids to array
+                ({ filesNames, dataset } = prepareForClustering( fids ));
+
+                var { clusters, ret } = clustering(event, dataset, minScore, eps);
+
+                res.status(202).send(`processed ${event} images:${filesNames.length} ${ret.clusters.length}  ${ret.noise.length}`);
+            })
+            .catch(console.error);
+
+    } else {
+        res.status(500).send('Something broke!')
+    }
+
+});
+
 // const image = require('./image');
 /**
- * Process following message 
+ * Process following message for storage event
   {
     "insertId": "650736c700005377186f524a",
     "jsonPayload": {
@@ -143,29 +175,7 @@ app.post('/api/match', async (req, res) => {
         res.status(500).send();
     }
 });
-
-app.post('/api/pubsub', (req, res) => {
-    if (!req.body) {
-        const msg = 'no Pub/Sub message received';
-        console.error(`error: ${msg}`);
-        res.status(400).send(`Bad Request: ${msg}`);
-        return;
-    }
-    if (!req.body.message) {
-        const msg = 'invalid Pub/Sub message format';
-        console.error(`error: ${msg}`);
-        res.status(400).send(`Bad Request: ${msg}`);
-        return;
-    }
-
-    const pubSubMessage = req.body.message;
-    const name = pubSubMessage.data
-        ? Buffer.from(pubSubMessage.data, 'base64').toString().trim()
-        : 'World';
-
-    console.log(`Hello ${name}!`);
-    res.status(204).send();
-});  
+ 
 
 app.use(function (err, req, res, next) {
     res.status(err.status || 500).json({status: err.status, message: err.message})

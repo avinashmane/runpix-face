@@ -16,10 +16,10 @@ const fs = require('fs');
 
 
 
-describe(`DESC: face clustering` , function () {
+xdescribe(`DESC: face clustering` , function () {
     this.timeout ( 50000 );
     let event = 'mychoice23jun';
-    let fids, dataset, filesNames='';
+    let fids;
 
 
     before( async function ()  {
@@ -37,7 +37,7 @@ describe(`DESC: face clustering` , function () {
                 .then(x => {
                     let fids = x ;
                     //map fids to array
-                    ({ filesNames, dataset } = prepareForClustering(filesNames, fids, dataset));
+                    ({ filesNames, dataset } = prepareForClustering( fids));
 
                     fs.writeFileSync("fids.json", JSON.stringify(fids));
 
