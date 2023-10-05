@@ -10,7 +10,8 @@ const { getStorage } = require('firebase-admin/storage');
 const {getApp}  = require( './myfirebase');
 const app=getApp()
 const storage = getStorage(app)
-const fs = require('fs');
+// const fs = require('fs');
+const { log, errorHandler} = require('./util')
 
 let folder=process.env['INPUT_FOLDER'] || 'processed'
 let bucket=process.env['BUCKET'] || 'run-pix.appspot.com'
@@ -23,26 +24,43 @@ exports.getEventFile = (event, file, gs_folder) =>{
 exports.readFile = async function (filePath) {
     let contents;
     try{
-        if (filePath.substring(0,5).toLowerCase()=='gs://' || filePath.includes(folder)){
-            let gs_path =getGSpath(filePath)
-            contents =   await getStorage().bucket(gs_path[1]).file(gs_path[2]).download()
+        //if (filePath.substring(0,5).toLowerCase()=='gs://' || filePath.includes(folder)){
+            let filepathWoBkt =filePath.replace(bucket,"")
+                                    .replace(/^\/+/, ''); // remove leading / if any
+            contents = await getStorage().bucket(bucket).file(filepathWoBkt).download()
             contents = contents[0]
-        } else {
-            contents = fs.readFileSync(filePath);
-        }
+        //} else {
+        //    contents = fs.readFileSync(filePath);
+        //}
         return contents;
     } catch (e) {
-        console.error(e)
+        errorHandler(e) ;
     }
 }
+
+exports.writeFile = async function (destFileName,blob) {
+    
+    try{
+        if ( destFileName.startsWith(bucket)) 
+            destFileName=destFileName.replace(bucket+'/')[1]
+        await getStorage().bucket(bucket).file(destFileName).save(blob);
+
+        log(`${destFileName} uploaded to ${bucket}.`      );
+          
+        return true;
+    } catch (e) {
+        errorHandler(e) ;
+    }
+}
+
 /**
- * 
+ * break into 3 path bucket,dirPath,filename
  * @param {*} dirPath 
  */
 function getGSpath(dirPath){
     let dirPref= dirPath.split("/",3) ;   
     let prefix = dirPath.replace(dirPref.join("/"),"")
-    if (prefix[0]=="/") prefix = prefix.substring(1)  
+    prefix = prefix.replace(/^\/+/, '')  //remove leading slash
     return ["gs://",dirPref[2],prefix]
 }
 

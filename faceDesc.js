@@ -9,10 +9,10 @@
 const path = require('path');
 const tf = require('@tensorflow/tfjs-node'); // in nodejs environments tfjs-node is required to be loaded before face-api
 const faceapi = require('./dist/face-api.node.js'); // use this when using face-api in dev mode
-
-const { getFiles , readFile , getEventFile }  = require("./filestorage.js")
+const  forEachOfLimit = require("async/eachOfLimit");
+const { writeFile , readFile , getEventFile }  = require("./filestorage.js")
 const { descriptor2blob, setDoc, delDoc,retrieveFaces  }  = require("./facedatabase.js")
-const { getAvg,log} = require('./util')
+const { getAvg,log, errorHandler} = require('./util')
 
 let modelLoaded=false
 const _ = require("lodash")
@@ -20,39 +20,55 @@ let subSet=_.pick //(obj,keys) => keys.reduce((a,k)=>{a[k]=obj[k];return a;},{})
 
 let optionsSSDMobileNet;
 
-const minConfidence = 0.1;
+const minConfidence = 0.8;
 const distanceThreshold = 0.9;
 const modelPath = 'model';
 
 async function initFaceAPI() {
+    if(modelLoaded) return
+    log("loading model")    
     await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath);
     await faceapi.nets.faceLandmark68Net.loadFromDisk(modelPath);
     await faceapi.nets.faceExpressionNet.loadFromDisk(modelPath);
     await faceapi.nets.faceRecognitionNet.loadFromDisk(modelPath);
     await faceapi.nets.ageGenderNet.loadFromDisk(modelPath);
     optionsSSDMobileNet = new faceapi.SsdMobilenetv1Options({ minConfidence, maxResults: 100 });
+    modelLoaded=true ;
 }
+exports.initFaceAPIOnce = initFaceAPI //_.once()
 
 /**
- * 
- * @param {*} imageFile 
+ * getDescriptors
+ * @param {*} imageObj or Blob
  * @param {*} minConfidence 
  */
-async function getDescriptors(imageFile,minConfidence) {
-    if (!modelLoaded) {
-        initFaceAPI(); modelLoaded=true;
+async function getDescriptors(imageObj,minConfidence) {
+    
+    await initFaceAPI() ; 
+
+    try{
+        var buffer = await getBufferStorage(imageObj)
+    } catch (e) {       //.catch(errorHandler);
+        console.error(`Error getting buffer`,imageObj,e)
     }
-    const buffer = await readFile(imageFile);
-    const tensor = tf.node.decodeImage(buffer, 3);
-    const faces = await faceapi.detectAllFaces(tensor, optionsSSDMobileNet)
-        .withFaceLandmarks()
-        .withFaceExpressions()
-        .withAgeAndGender()
-        .withFaceDescriptors();
-    tf.dispose(tensor);
-    //   faces.forEach(f=>{
-    //     log.data(`x:${xpct} y:${ypct} ${expr[0]} ${expr[1].toFixed(2)}`,f.gender,f.age.toFixed(0))
-    //   })
+
+    try{
+        const tensor = tf.node.decodeImage(buffer, 3) ; 
+    
+        var faces = await faceapi.detectAllFaces(tensor, optionsSSDMobileNet)
+            .withFaceLandmarks()
+            .withFaceExpressions()
+            .withAgeAndGender()
+            .withFaceDescriptors();
+        tf.dispose(tensor);
+    } catch (e) {
+        // faces.forEach(f=>{
+        //     log.data(`x:${xpct} y:${ypct} ${expr[0]} ${expr[1].toFixed(2)}`,f.gender,f.age.toFixed(0))
+        //   })
+        console.error("error processing",imageObj)
+        errorHandler(e)
+    }
+
     return faces.filter(x=>(x.detection.score> (minConfidence||0.7)))
                 .map((f) => {
 
@@ -74,21 +90,37 @@ async function getDescriptors(imageFile,minConfidence) {
     });
 }
 
+async function getBufferStorage(imageObj) {
+    let buffer
+    if ( imageObj.kind == 'storage#object')  // source is storage object
+        buffer = await readFile(imageObj.imageFile);
+    else {
+        buffer = imageObj.buffer; //assume buffer  // source is buffer
+        let GCSpath = `faceuploads/${imageObj.event}/${imageObj.imageFile.split('/').pop()}`;
+        writeFile(GCSpath, buffer);
+    }
+    return buffer;
+}
+
 /**
  * 
  * @param {*} event 
  * @param {*} inputFile 
  * @param {*} noDbSave 
  */
-async function registerImage(event,inputFile,noDbSave) {
-    if (!inputFile.toLowerCase().endsWith('jpg') && !inputFile.toLowerCase().endsWith('png') && !inputFile.toLowerCase().endsWith('gif')) return [];
+async function registerImage(imageObj) {
+
+    let {event, imageFile,noDbSave}=imageObj
+    imageFile=imageFile.split("/").pop()
+    
+    if (!imageFile.toLowerCase().endsWith('jpg') && !imageFile.toLowerCase().endsWith('png') && !imageFile.toLowerCase().endsWith('gif')) return [];
     // log('Registering', inputFile);
-    let data =await getDescriptors(getEventFile(event, inputFile));
+    let data =await getDescriptors(imageObj); //removed getEventFile(event, imageFile)
                 
     let faceDescriptors=data.map(x=> subSet(x, ["fid","expression","age","gender","pos","score"]))
     if(!noDbSave) {
-        saveFaces(event,inputFile,{"f":faceDescriptors})
-        log(`${inputFile}: ${faceDescriptors.length} faces`)
+        saveFaces(event,imageFile,{"f":faceDescriptors})
+        log(`${imageFile}: ${faceDescriptors.length} faces`)
     }
     return faceDescriptors
 
@@ -97,38 +129,35 @@ async function registerImage(event,inputFile,noDbSave) {
 
 function saveFaces(event,image,data){
     let fspath = (i) => `races/${event}/images/${image}/f/${i}`
-    // setDoc(fspath(i),x)
     
     data=data.f.map((x,i)=>{
-                        // x.fid=descriptor2fid(x.fid)
                         x.fid=descriptor2blob(x.fid)
                         setDoc(fspath(i),x)
                     })
-    // const fs = require('fs');
-    // fs.writeFileSync('database'+'.db',JSON.stringify(data))
 }
 
 /**
  * 
  * @param {*} event 
- * @param {*} filePath 
+ * @param {*} imageObj (could be Object)
  * @param {*} opts : maxDist, firebaseResults
  */
-async function matchFaceInFile(event,filePath,opts) {
+async function matchFaceInFile(event,imageObj,opts) {
 
-    let clusters = await retrieveFaces(event) ;
+    let clusters = await retrieveFaces(event).catch(errorHandler) ;
+        
+    var searchFids = await getFacesSearchFile(imageObj)
+                                .catch(errorHandler) ;
     
-    var searchFids = await getFacesSearchFile(filePath);
-    
-    if  (!searchFids.length) {
-        log(`No faces found in the ${filePath}`)
+    if  (!searchFids?.length) {
+        log(`No faces found in the uploaded image`)
         throw new Error('No faces to search') 
     }
     
-    maxDist = opts?.maxDist || 0.35 //lower is strict
+    let maxDist = opts?.maxDist || 0.6 //lower is strict
 
     if (opts?.firebaseResults){
-        var basename=filePath.split('/').pop() 
+        var basename=imageObj.imageFile.split('/').pop() ;
         setDoc(`facesearch/${event}/uploads/${basename}`,
             {
                 ts:new Date().toISOString(),
@@ -137,62 +166,66 @@ async function matchFaceInFile(event,filePath,opts) {
             })
     }    
     let matches=[] ;
-
+    let stats={} ;
     clusters.forEach((clust,i)=>{  // for face in file
 
         for (let searchFaceNo = 0; searchFaceNo < searchFids.length; searchFaceNo++) {           
             // process.stdout.write(`\t\t\t\t${i}/${clusters.length}\r`);
-
+            // log(stats)
             let dist = faceapi.euclideanDistance(
                                 searchFids[searchFaceNo].fid, 
-                                clusters[i].fid)
+                                clust.fid)
 
+            stats[parseInt(dist*10)]= 1 + (stats[parseInt(dist*10)]??0)
+            
             if (dist <= maxDist) {
-                let files
-                if(_.isArray(clusters[i].file))
-                    files=clusters[i].file
-                else
-                    files=[clusters[i].file]
+                // if a single file make it a array
+                let files = (_.isArray(clust.file)) ? clust.file : [clust.file]
                 
-                    // insert one row for each file
-                log(`search:${searchFaceNo} = ${i} => ${(dist).toFixed(2)} ${clusters[i].size}/${file[0].slice(-15)}`)    
-                    
-                files.forEach((file,j)=>{
+                let saveMatchesInDb = async (file,j)=>{
+                    // console.warn(j) //`search:${searchFaceNo} = ${i} => ${dist.toFixed(2)} ${clust.file}}`,String(j).padStart(2,'0'))   
                     let matchImg={
                         dist:dist,
                         file:file,
                         score: clusters[i].score
                     }
                     matches.push(matchImg)
-
+                    
                     if (opts?.firebaseResults){        
                         let clustName =`${String(i).padStart(4, '0')}${clusters[i].size?"=":"-"}${String(j).padStart(2,'0')}`
                         setDoc(`facesearch/${event}/uploads/${basename}/matches/${clustName}`,matchImg)
+                            // .then(x=>log("saved",x))
+                            .catch(errorHandler) ;
                     }
-                }) ;
-
-                
-                
+                }
+                // insert one row for each file   
+                // await forEachOfLimit(files,2,saveMatchesInDb) ; 
+                files.forEach(saveMatchesInDb) ;              
             }              
         }
     })        
-    
     matches.sort(function (a, b) { return b[1] - a[1]; })
+    // log(stats)
+    log(`${matches.length} matches found with maxDist: ${maxDist}`)
     return matches
-
 }
 
+/**
+ * 
+ * @param {*} imageObj 
+ */
+async function getFacesSearchFile(imageObj) {
+    // if ( imageObj.kind == 'storage#object') {
+        // var searchFids = await getDescriptors(imageObj);
 
-async function getFacesSearchFile(filePath) {
-    if (typeof filePath === 'string') {
-        // var searchFids=fids.filter(x=>x.file==file)
-        var searchFids = await getDescriptors(filePath);
+    // } else {
+        var searchFids = await getDescriptors(imageObj)
+            .catch(new Error('cant get descriptors'));
+        // console.error("send the blob for scanning");
+    // }
 
-        searchFids = searchFids.filter((f, i) => (f.score > .98) || (i <= 0));
-        log(`Found ${searchFids.length} faces for scanning in ${filePath}`);
-    } else {
-        console.error("send the blob for scanning");
-    }
+    searchFids = searchFids.filter((f, i) => (f.score > .98) || (i <= 0));
+    log(`Found ${searchFids.length} faces for scanning in ${imageObj.imageFile}`);
     return searchFids;
 }
 
@@ -214,7 +247,7 @@ function extractUrl(event, dataset, i) {
 //         console.error([1], 'Expected <source image or folder> <target database>.'+`Got ${argv.length} arguments`);
 //         process.exit(1);
 //     }
-//     await initFaceAPI();
+//     await initFaceAPIOnce();
 //     // log.info('Input:', argv[2]);
 
 //     dbFile = path.join(argv[2], `${argv[3]}`)

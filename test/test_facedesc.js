@@ -41,7 +41,10 @@ describe("facedesc1: conversion", function() {
     it('identify good faces', (done)=>{
         let file='2023-06-11T06:17:24.158Z~VENUE~presspune$gmail.com~1P6A7022.jpg'
     
-        registerImage(event,file)
+        registerImage({
+            event:event,
+            imageFile:file
+        })
             .then(x=>  data=x )
             .catch(e=>  console.error('Error identify good faces')); //`gs://${bucket}/`+ 
         log(data) //.map(x=>[x.age,x.gender])
@@ -183,7 +186,10 @@ describe(`facedesc3: bulk load`,()=>{
 
         for (const f of dir) {
             // log(f)
-            let fDescr = await registerImage(event,f)
+            let fDescr = await registerImage({
+                                                event:event,
+                                                imageFile:f
+                                            })
                                     .catch(console.error);
         }
         console.info(`processed ${dir.length}`);

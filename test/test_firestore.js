@@ -14,11 +14,7 @@ const {listColls, getDocs,delDoc, setDoc, retrieveFaces } = require('../facedata
 const { getUrl} = require('../filestorage');
 const assert = require("assert")
 // const {Blob} = require("@firebase/database-types") //"firebase-admin/firestore")
-const {
-    Float16Array, isFloat16Array, isTypedArray,
-    getFloat16, setFloat16,
-    f16round,
-  } = require("@petamoriken/float16");
+
 const faceapi = require('../dist/face-api.node.js');  
   
 describe("Firestore: facedatabase", function() {

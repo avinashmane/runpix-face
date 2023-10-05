@@ -137,7 +137,7 @@ let getIds= async function (path) {
 }
 
 exports.setDoc= async function (path,data) {
-    // console.log(db.collection)
+    // console.log(`Writing to ${path}`)
     try{
         ret = await db.doc(path).set(data)   
         return ret

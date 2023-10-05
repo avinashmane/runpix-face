@@ -15,7 +15,7 @@
     <nav id="main-nav" class="container-fluid navbar navbar-dark bg-inverse {{ main_nav_classes }}">
       <div class="container">
         {% block nav %}
-        	{% set navItems = [{"menu_item" : "Index"}, {"menu_item" : "Page 1"}, {"menu_item" : "Page 2"}] %}
+        	{% set navItems = [{"menu_item" : "Index"}, {"menu_item" : "Races"}, {"menu_item" : "Photos"}] %}
           {% include "components/nav.html" %}
         {% endblock %}
       </div>
@@ -27,11 +27,12 @@
         {% endblock %}
       </div>
     </header>
+
     <section id="main-section" class="container-fluid {{ main_section_classes }}">
       <div class="container">
         {% block main %}
         <!-- This block (and any other block) can be replaced using template inheritance, or leave the default content in -->
-          <h2>This is the default content.</h2>
+          <h2>Stay curious my friend!</h2>
           <!-- <p>It's inside of the <code>{{ "{% block main %}" | escape }}</code>, so it will appear in any file using this template. You can override it directly from that file.</p> -->
         {% endblock %}
       </div>

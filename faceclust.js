@@ -112,48 +112,6 @@ let meanDescriptor = (descArray) => {
     return new Float32Array(iTo128.map(i => getAvg(descArray, i)));
 };
 
-// async function main(argv) {
-//     argv= argv||process.argv
-//     argv=argv.filter(x=> !["mocha","--watch","--slow"].some(kw=>x.includes(kw)))
-//     // console.log(argv)
-//     fileDescriptors={}
-
-//     // log.header();
-//     if (argv.length !== 4) {
-//         console.error([1], 'Expected <source image or folder> <target database>.'+`Got ${argv.length} arguments`);
-//         process.exit(1);
-//     }
-//     await initFaceAPI();
-//     // log.info('Input:', argv[2]);
-
-//     dbFile = path.join(argv[2], `${argv[3]}`)
-    
-//     let dir = await getFiles(argv[2]);
-
-//     for (const f of dir) {
-//         let fDescr = await registerImage(argv[2]+ f)
-        
-//         fileDescriptors[f]=fDescr.map(x=> subSet(x, ["fid","expression","age","gender","pos"]))
-//         console.log(`${f}: ${fDescr.length} faces`)
-                
-//         saveFaces(f,{"f":fileDescriptors[f]})
-        
-//         // for (let d of fDescr){
-//         //     fileDescriptors.push(d);
-//         // }  ; // register all images in a folder
-
-//         // break; //for faster development
-//     }
-
-//     log('Saving:', dbFile, 'Descriptors:', fileDescriptors.length);
-//     if (fileDescriptors.length > 0) {
-        
-//         writeDatabase(argv[2],fileDescriptors)
-
-//     } else {
-//         log('No registered faces');
-//     }
-// }
 
 exports.clustering=clustering
 exports.prepareForClustering=prepareForClustering

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% set base_path = "../" %}
+{% set page_title = "Races page | Run Pix Face" %}
+{% set page_description = "Race Management" %}
+{% set main_header_clasheadses = "jumbotron jumbotron-fluid" %}
+
+{% import "components/macro-card.html" as macroCard %}
+
+{% block main %}
+
+  {{ super() }}
+
+  <div class="card-deck-wrapper">
+    
+    <h2>Race Management</h2>
+    <form>
+        <p>
+            <label for="event">Event Id</label>
+            <input type="text" id="event" name="event"/>
+        </p>
+        <button type="submit" formaction="/api/eventscan">Scan faces</button>
+        <button type="submit" formaction="/api/eventcluster">Cluster the faces</button>
+    </form>
+    
+  </div>
+
+{% endblock %}
