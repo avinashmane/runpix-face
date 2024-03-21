@@ -13,11 +13,11 @@ const {getApp} =require("../myfirebase")
 const {listColls, getDocs,delDoc, setDoc, retrieveFaces } = require('../facedatabase.js');
 const { getUrl} = require('../filestorage');
 const assert = require("assert")
-// const {Blob} = require("@firebase/database-types") //"firebase-admin/firestore")
+process.env.GOOGLE
 
 const faceapi = require('../dist/face-api.node.js');  
   
-describe("Firestore: facedatabase", function() {
+describe("Firestore: facedatabase basic operations", function() {
     let app
     let test_path = '/test'
     let test_data={"comments":"test"}
@@ -38,7 +38,7 @@ describe("Firestore: facedatabase", function() {
     });
 
     it("firestore:projectId", function() {
-        // console.log(app?.options?.credential?.projectId || app)
+        console.log(app?.options?.credential?.projectId || app)
         expect(app?.options?.credential?.projectId).to.equal('run-pix');
     });
 

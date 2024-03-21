@@ -25,7 +25,8 @@ exports.readFile = async function (filePath) {
     let contents;
     try{
         //if (filePath.substring(0,5).toLowerCase()=='gs://' || filePath.includes(folder)){
-            let filepathWoBkt =filePath.replace(bucket,"")
+            let filepathWoBkt =filePath.split(bucket).pop()
+            // let filepathWoBkt =filePath.replace(bucket,"")
                                     .replace(/^\/+/, ''); // remove leading / if any
             contents = await getStorage().bucket(bucket).file(filepathWoBkt).download()
             contents = contents[0]

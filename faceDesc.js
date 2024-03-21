@@ -11,7 +11,7 @@ const tf = require('@tensorflow/tfjs-node'); // in nodejs environments tfjs-node
 const faceapi = require('./dist/face-api.node.js'); // use this when using face-api in dev mode
 const  forEachOfLimit = require("async/eachOfLimit");
 const { writeFile , readFile , getEventFile }  = require("./filestorage.js")
-const { descriptor2blob, setDoc, delDoc,retrieveFaces  }  = require("./facedatabase.js")
+const { descriptor2blob, setDoc, delDoc,retrieveFaces, setDocArray  }  = require("./facedatabase.js")
 const { getAvg,log, errorHandler} = require('./util')
 
 let modelLoaded=false
@@ -50,6 +50,7 @@ async function getDescriptors(imageObj,minConfidence) {
         var buffer = await getBufferStorage(imageObj)
     } catch (e) {       //.catch(errorHandler);
         console.error(`Error getting buffer`,imageObj,e)
+        return []
     }
 
     try{
@@ -67,6 +68,7 @@ async function getDescriptors(imageObj,minConfidence) {
         //   })
         console.error("error processing",imageObj)
         errorHandler(e)
+        return [] 
     }
 
     return faces.filter(x=>(x.detection.score> (minConfidence||0.7)))
@@ -119,21 +121,30 @@ async function registerImage(imageObj) {
                 
     let faceDescriptors=data.map(x=> subSet(x, ["fid","expression","age","gender","pos","score"]))
     if(!noDbSave) {
-        saveFaces(event,imageFile,{"f":faceDescriptors})
-        log(`${imageFile}: ${faceDescriptors.length} faces`)
+        await saveFaces(event,imageFile,{"f":faceDescriptors})
+        log(`${imageObj.i||'-'}: ${imageFile}: ${faceDescriptors.length} faces`)
     }
     return faceDescriptors
 
 }
 
-
-function saveFaces(event,image,data){
-    let fspath = (i) => `races/${event}/images/${image}/f/${i}`
+async function saveFaces(event,image,data){
+    // let fspath = (i) => `races/${event}/images/${image}/f/${i}`
     
-    data=data.f.map((x,i)=>{
+    // data=data.f.map(async (x,i)=>{
+    //                     x.fid=descriptor2blob(x.fid)
+    //                     await setDoc(fspath(i),x)
+    //                 })
+
+    let path = `races/${event}/images/${image}/f`
+
+    data=data.f.map( (x,i)=>{
                         x.fid=descriptor2blob(x.fid)
-                        setDoc(fspath(i),x)
+                        return x
                     })
+
+    return await setDocArray(path,data)
+                    
 }
 
 /**

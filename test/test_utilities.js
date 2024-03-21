@@ -12,81 +12,18 @@
 const {expect,assert} = chai = require('chai');
 const {getApp} =require("../myfirebase")
 const {listColls, getDocs,delDoc, setDoc, retrieveFaces,
-        blob2descriptor, descriptor2blob , descriptorToB64,b64ToDescriptor
+        blob2descriptor, descriptor2blob , descriptorToB64,b64ToDescriptor, getIds
         } = require('../facedatabase.js');
 const {matchFaceInFile,registerImage} = require("../faceDesc")
 const { getUrl,getEventFile: getImageFile,getFiles,bucket} = require('../filestorage');
 const faceapi = require('../dist/face-api.node.js'); 
 const { log} = require('../util') 
 const _ = require("lodash")
-const fs = require('fs')
+const fs = require('fs');
+const { start } = require('repl');
   
-describe("facedesc1: conversion", function() {
-    this.timeout ( 1000);
-    let app
-    let test_path = '/test'
-    let test_data={"comments":"test"}
-    let event= 'mychoice23jun'    
 
-    before(async function (done)  {
-        
-        retrieveFacesAll(event)
-            .then(fids => {
-
-                done()
-
-            })
-            .catch(console.error);
-        assert.fail(`${filesNames.length} files found with ${dataset.length} faces`)
-
-    })
-
-    it('identify good faces', (done)=>{
-        let file='2023-06-11T06:17:24.158Z~VENUE~presspune$gmail.com~1P6A7022.jpg'
-    
-        registerImage({
-            event:event,
-            imageFile:file
-        })
-            .then(x=>  data=x )
-            .catch(e=>  console.error('Error identify good faces')); //`gs://${bucket}/`+ 
-        log(data) //.map(x=>[x.age,x.gender])
-        done()
-    })
-
-   
-    
-    it('blob conversion',()=>{
-        arr=new Float32Array([.1,.1,.1,.1,.1,.2,.3,.4,2,5])
-        b=descriptor2blob(arr)
-        setDoc('test/mocha/t/case1',{'blob':b});
-        log("saved",b)
-        b2 = getDocs('test/mocha/t').then(x=>{
-                log(blob2descriptor(x.case1.blob))
-            })
-
-        newArr=blob2descriptor(b);
-        log(JSON.stringify([arr,,newArr]))
-    })    
-
-    it('b64 conversion',()=>{
-        arr=new Float32Array([.1,.1,.1,.1,.1,.2,.3,.4,2,5])
-        b=descriptorToB64(arr)
-        setDoc('test/mocha/t/case2',{'blob':b});
-        log("saved",b)
-        b2 = getDocs('test/mocha/t').then(x=>{
-                // log(">>>",btoa(x?.case?.blob))
-                log(b64ToDescriptor(x.case2.blob))
-            })
-
-        newArr=b64ToDescriptor(b);
-        log(JSON.stringify([arr,newArr]))
-    })    
-
-  
-  });
-
-  describe("facedesc2: face match :",function () {
+xdescribe("facedesc2: face match :",function () {
     let event='mychoice23jun';
     let results={}
     this.timeout(25000);
@@ -181,13 +118,40 @@ describe("facedesc1: conversion", function() {
 })   
 
 
-describe(`facedesc3: bulk load`,()=>{
+xdescribe(`facedesc3: bulk load`,()=>{
     const mapLimit = require( 'async/mapLimit');
     let event='werun2024';
-    let startFileNumber = 9000
+    let startFileNumber = 12000
     let endFileNumber = null
+    let firestore_images_file = `test/data/firestore_images_${event}.json`
+    let storage_processed_file = `test/data/storage_processed_${event}.json`
+
+
+    before(async (done)=>{
+        log("loading data")
+        if (fs.existsSync(firestore_images_file)){
+            log(`${firestore_images_file} exists`)             
+        } else {
+     
+            log(`races/${event}/images`)
+            images = await getIds(`races/${event}/images`)
+            log(`writing list of ${images.length} images to ${firestore_images_file}`)
+            fs.writeFileSync(firestore_images_file, JSON.stringify(images) )
+        }
+
+        if (fs.existsSync(storage_processed_file)){
+                log(`${storage_processed_file} exists`)
+                
+        } else {       
+            st_path=getImageFile( event , "")
+            const dir = await getFiles(st_path) ;
+            log(`writing list of ${dir.length} at ${st_path} to ${storage_processed_file}`);
+            fs.writeFileSync(storage_processed_file, JSON.stringify(dir) )
+        }
+        done()
+    });  
     
-    it(`Race/slice ${event} bulk`,async (done)=>{
+    xit(`Race/slice ${event} bulk`,async (done)=>{
         log("reading files")
         st_path=getImageFile( event , "")
         let dir = await getFiles(st_path) ;
@@ -209,14 +173,38 @@ describe(`facedesc3: bulk load`,()=>{
 
     }).timeout(5000000);  
 
+
+
     it(`Race ${event} smart`,async (done)=>{
         // st_path=getImageFile( event , "")
         // const dir = await getFiles(st_path) ;
         // log(`processing ${dir.length} at ${st_path}`);
-        log(`reading images`)
-        images = await getDocs(`races/${event}/images`)
-        log(`${images.length} images`)
+        let dir = JSON.parse(fs.readFileSync(storage_processed_file))
+        log(`${storage_processed_file}: ${dir.length} blob imeages`)
+        
+        let images = JSON.parse(fs.readFileSync(firestore_images_file))
+        log(`${firestore_images_file}: ${images.length} image entries`)
 
+        // images.slice(10,20).forEach((img,i)=>{
+        for (let i=startFileNumber; i<(endFileNumber||images.length);i++) {
+            img=images[i]
+            fids = await getIds(`races/${event}/images/${img}/f`)
+            
+            if (fids.length==0){
+                const file_path=`processed/${event}/${img}`
+                let fDescr = await registerImage({
+                                                                i:i,
+                                                                event:event,
+                                                                imageFile: file_path,
+                                                                kind : 'storage#object'
+                                                            })
+                                                        .catch(console.error);
+            } else {
+                log(`${i}:${img} : ${fids.length} faces registered`)
+            }
+        }
+
+        //
         // for (let i=0;i<dir.length;i++) {
         //     f=dir[i]
             
@@ -233,27 +221,43 @@ describe(`facedesc3: bulk load`,()=>{
         // }
         // console.info(`processed ${dir.length}`);
         done()
+        assert(images.length.to.greaterThan(0))
     }).timeout(5000000);  
 
 
 })
 
-describe(`facedesc4: troubleshoot image`,()=>{
+const yaml = require('js-yaml');
+let imgFaces=yaml.load(
+`
+- processed/werun2024/2024-03-17T08:31:20.000Z~VENUE~avinashmane$gmail.com~1Z2A9807.jpg: 3
+- processed/werun2024/2024-03-17T08:31:22.000Z~VENUE~avinashmane$gmail.com~1Z2A9808.jpg: 0
+`)  
+// log(imgFaces)
+
+describe(`facedesc4: troubleshoot image`,function (){
     let event= 'werun2024'
 
-    it("one image in  werun2024",async (done)=>{
-        // let event='mychoice23jun';
-        const f = 'processed/werun2024/2024-03-17T01:51:58.698Z~VENUE~ranerohitv$gmail.com~img_313.jpg';
+    imgFaces.forEach(x=>log(x))
+    it('one image in werun2024',async function (done) {
+        // const f = 'processed/')    
+        for (let i=0;i<imgFaces.length;i++) {    
         
-        let fDescr = await registerImage({
-                                            event:event,
-                                            imageFile: f,
-                                            kind : 'storage#object'
-                                        })
-                                .catch(console.error);
-        console.info(`processed ${dir.length}`);
-                                    
-        done()
-    }).timeout(5000000);  
+            // const f = 'processed/werun2024/2024-03-17T01:51:58.698Z~VENUE~ranerohitv$gmail.com~img_313.jpg';
+            let [rec]=Object.entries(imgFaces[i])
+            log(rec);
+            const f =  rec[0]// zero image
 
+            let fDescr = await registerImage({
+                                                event:event,
+                                                imageFile: f, //getImageFile( event , f),
+                                                kind : 'storage#object'
+                                            })
+                                    .catch(console.error);
+            assert(fDescr.faces.length.to.equal(rec[1]))
+        }                                
+        done()
+
+    }).timeout(200000);  
+    
 })

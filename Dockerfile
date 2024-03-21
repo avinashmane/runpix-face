@@ -36,7 +36,7 @@ RUN npm install --only=production
 COPY . ./
 
 # Run the web service on container startup.
-CMD [ "node", "index.js" ]
+ENTRYPOINT [ "node", "index.js" ]
 
-# [END run_helloworld_dockerfile]
-# [END cloudrun_helloworld_dockerfile]
+# help: node index.js [SCAN|CLUSTER|SCANCLUSTER|NO_LISTEN|SERVER] [RACEID]
+

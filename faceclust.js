@@ -51,7 +51,7 @@ function clustering(event, dataset, minScore, eps) {
         distanceFunction: (a, b) => faceapi.euclideanDistance(a.fid, b.fid)
     });
 
-    log(minScore, eps, n, ret.clusters.length, ret.noise.length);
+    log(`minScore:${minScore}, dbscan eps:${eps}, selected imgs: ${n}, clusters: ${ret.clusters.length}, noise: ${ret.noise.length}`);
 
     let clusters = ret.clusters.map(clust => clust.map(i => data[i]));
 
@@ -84,6 +84,7 @@ function clustering(event, dataset, minScore, eps) {
         }
     })
     
+    log('clustering done')    
     return { clusters, ret };
 
 }

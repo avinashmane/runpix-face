@@ -142,8 +142,28 @@ exports.setDoc= async function (path,data) {
         ret = await db.doc(path).set(data)   
         return ret
     } catch (e) {
-        console.error(e)
+        console.error(path,e.message || e)
     }
+}
+
+exports.setDocArray = async function (path,dataArray) {
+    // Get a new write batch
+    const batch = db.batch();
+
+    // Set the value of 'NYC'
+    dataArray.forEach((data,i) => {
+        const docRef = db.doc(`${path}/${i}`);
+        batch.set(docRef, data);
+    })
+    // const nycRef = db.collection('cities').doc('NYC');
+    // batch.set(nycRef, {name: 'New York City'});
+
+    // // Update the population of 'SF'
+    // const sfRef = db.collection('cities').doc('SF');
+    // batch.update(sfRef, {population: 1000000});
+
+    // Commit the batch
+    return await batch.commit();
 }
 
 exports.delDoc= async function (path, options) {
